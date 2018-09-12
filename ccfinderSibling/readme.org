@@ -1,0 +1,106 @@
+#+STARTUP: showall
+#+STARTUP: lognotestate
+#+TAGS: research(r) uvic(u) today(y) todo(t) cooking(c)
+#+SEQ_TODO: TODO(t) STARTED(s) DEFERRED(r) CANCELLED(c) | WAITING(w) DELEGATED(d) APPT(a) DONE(d) 
+#+DRAWERS: HIDDEN STATE
+#+ARCHIVE: %s_done::
+#+TITLE: Script to find copies of files from ccfinder's output
+#+CATEGORY: 
+#+PROPERTY: header-args:sql             :engine postgresql  :exports both :cmdline csc370
+#+PROPERTY: header-args:sqlite          :db /path/to/db  :colnames yes
+#+PROPERTY: header-args:C++             :results output :flags -std=c++14 -Wall --pedantic -Werror
+#+PROPERTY: header-args:R               :results output  :colnames yes
+#+OPTIONS: ^:nil
+
+This script assumes that you have already run ccfinder on a set of files. It simply assumes that the goal
+is to show the similarity between two files. I define similarity(A,B) as the proportion of tokens in file A that appear in file B.
+This means the metric is not symmetric.
+
+* How to run
+
+Create file containing the paths to the files. As an example I will use the files in the test directory. Call this file test.files
+
+#+BEGIN_EXAMPLE
+test/test_1.c
+test/test_2.c
+#+END_EXAMPLE
+
+Now run ccfinder. Keep in mind, you can play with the parameters to suit your specific needs. For example, here I am specifying that the minimum clone
+is of 3 tokens:
+
+#+BEGIN_SRC sh
+ccfx d cpp -s 0 -b 3 -t 3 -i test.files 
+#+END_SRC
+
+This will create a file a.ccfxd
+
+Now run:
+
+#+BEGIN_SRC 
+ccfx p a.ccfxd
+#+END_SRC
+
+This will output the "clone pairs". Each clone set identified with a number. It will list the fileA and fileB and the token range that is the clone. 
+
+#+BEGIN_EXAMPLE
+ntu32/ccfx p a.ccfxd  
+version: ccfx 10.2.7
+format: pair_diploid
+option: -b 3
+option: -s 0
+option: -u +
+option: -t 3
+option: -w f+g+w+
+option: -j +
+option: -k 60m
+option: -preprocessed_file_postfix .cpp.2_0_0_2.default.ccfxprep
+option: -pp +
+preprocess_script: cpp
+source_files {
+1	test/test_1.c	38
+2	test/test_2.c	40
+}
+source_file_remarks {
+}
+clone_pairs {
+2	1.2-5	1.23-26
+2	1.23-26	1.2-5
+1	1.0-26	2.0-26
+2	1.2-5	2.23-26
+2	1.23-26	2.2-5
+6	1.26-37	2.28-39
+1	2.0-26	1.0-26
+2	2.2-5	1.23-26
+2	2.23-26	1.2-5
+6	2.28-39	1.26-37
+2	2.2-5	2.23-26
+2	2.23-26	2.2-5
+}
+clone_set_remarks {
+}
+#+END_EXAMPLE
+
+
+Now you run the "sibling" detector (see my MSR paper on siblings from many years back at [[http://github.com/dmgerman/papers]]
+
+#+BEGIN_SRC sh
+ccfx p a.ccfxd | perl ./siblingDetect.pl
+#+END_SRC
+
+This is the output. 
+
+#+BEGIN_EXAMPLE
+Files Read 2
+.>>2
+test/test_1.c;test/test_2.c;37;38;0.973684210526316
+test/test_2.c;test/test_1.c;37;40;0.925
+#+END_EXAMPLE
+
+The columns separated by ; and are:
+
+| fileA                        |
+| fileB                        |
+| clone tokens in A found in B |
+| number of tokens in A        |
+| proportion of tokens in A found in B |
+
